@@ -67,7 +67,7 @@ export const Badge = (props: Props) => {
           color: props.poweredByTextColor ?? defaultTextColor,
         }}
       >
-        <span> eFlowAI</span>
+        <span> eFlowai</span>
       </a>
     </span>
   );
