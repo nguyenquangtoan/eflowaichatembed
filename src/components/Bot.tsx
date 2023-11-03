@@ -3,6 +3,9 @@ import {
   sendMessageQuery,
   isStreamAvailableQuery,
   IncomingInput,
+  createNewChatmessage,
+  getMessageHistory,
+  createCustomerBaseRow,
 } from "@/queries/sendMessageQuery";
 import { TextInput } from "./inputs/textInput";
 import { GuestBubble } from "./bubbles/GuestBubble";
@@ -17,6 +20,7 @@ import {
 import { Badge } from "./Badge";
 import socketIOClient from "socket.io-client";
 import { Popup } from "@/features/popup";
+import { v4 as uuidv4 } from "uuid";
 
 type messageType = "apiMessage" | "userMessage" | "usermessagewaiting";
 
@@ -24,6 +28,30 @@ export type MessageType = {
   message: string;
   type: messageType;
   sourceDocuments?: any;
+};
+
+export type MessageHistoryType = {
+  chatflowid: string;
+  content: string;
+  createdDate: string;
+  customerId: string;
+  id: string;
+  role: messageType;
+  sourceDocuments: null;
+};
+
+export type FormData = {
+  fullName: string;
+  email: string;
+  phone: string;
+  message: string;
+};
+
+export type FormErrors = {
+  fullName: string;
+  email: string;
+  phone: string;
+  message: string;
 };
 
 export type BotProps = {
@@ -117,6 +145,10 @@ const defaultWelcomeMessage = "Hi there! How can I help?";
         }
     },
 ]*/
+type Inputs = {
+  fullName: string;
+  exampleRequired: string;
+};
 
 export const Bot = (props: BotProps & { class?: string }) => {
   let chatContainer: HTMLDivElement | undefined;
@@ -139,6 +171,9 @@ export const Bot = (props: BotProps & { class?: string }) => {
   const [socketIOClientId, setSocketIOClientId] = createSignal("");
   const [isChatFlowAvailableToStream, setIsChatFlowAvailableToStream] =
     createSignal(false);
+  const [chatHistory, setChatHistory] = createSignal<MessageHistoryType[]>();
+  const [hasCurrentCustomer, setHasCurrentCustomer] = createSignal(false);
+  const [customerId, setCustomerId] = createSignal("");
 
   onMount(() => {
     if (!bottomSpacer) return;
@@ -177,6 +212,58 @@ export const Bot = (props: BotProps & { class?: string }) => {
     });
   };
 
+  // Get chatmessages successful
+  createEffect(() => {
+    const history = chatHistory();
+
+    if (history) {
+      const loadedMessages: MessageType[] = [];
+      for (const message of history) {
+        const obj: MessageType = {
+          message: message.content,
+          type: message.role,
+        };
+        if (message.sourceDocuments) {
+          obj.sourceDocuments = JSON.parse(message?.sourceDocuments);
+        }
+
+        loadedMessages.push(obj);
+      }
+      setMessages((prevMessages) => [...prevMessages, ...loadedMessages]);
+    }
+
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chatHistory]);
+
+  const addChatMessage = async (
+    message: any,
+    type: any,
+    sourceDocuments?: any
+  ) => {
+    try {
+      const currentCustomer = JSON.parse(
+        localStorage?.getItem("customer") || ""
+      );
+      if (currentCustomer) {
+        const newChatMessageBody: any = {
+          role: type,
+          content: message,
+          chatflowid: props.chatflowid,
+          customerId: currentCustomer?.ID,
+        };
+        if (sourceDocuments)
+          newChatMessageBody.sourceDocuments = JSON.stringify(sourceDocuments);
+        await createNewChatmessage({
+          chatflowid: props.chatflowid,
+          apiHost: props.apiHost,
+          body: newChatMessageBody,
+        });
+      }
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
   // Handle errors
   const handleError = (
     message = "Oops! There seems to be an error. Please try again."
@@ -185,13 +272,14 @@ export const Bot = (props: BotProps & { class?: string }) => {
       ...prevMessages,
       { message, type: "apiMessage" },
     ]);
+    addChatMessage(message, "apiMessage");
     setLoading(false);
     setUserInput("");
     scrollToBottom();
   };
 
   // Handle form submission
-  const handleSubmit = async (value: string) => {
+  const handleSubmitMessage = async (value: string) => {
     setUserInput(value);
 
     if (value.trim() === "") {
@@ -211,6 +299,9 @@ export const Bot = (props: BotProps & { class?: string }) => {
       ...prevMessages,
       { message: value, type: "userMessage" },
     ]);
+
+    // waiting for first chatmessage saved, the first chatmessage will be used in sendMessageAndGetPrediction
+    await addChatMessage(value, "userMessage");
 
     const body: IncomingInput = {
       question: value,
@@ -241,13 +332,17 @@ export const Bot = (props: BotProps & { class?: string }) => {
               type: "apiMessage",
             },
           ]);
+          addChatMessage(data.text, "apiMessage", data.sourceDocuments);
         }
       } else {
-        if (!isChatFlowAvailableToStream())
+        if (!isChatFlowAvailableToStream()) {
           setMessages((prevMessages) => [
             ...prevMessages,
             { message: data, type: "apiMessage" },
           ]);
+        }
+
+        addChatMessage(data, "apiMessage");
       }
       setLoading(false);
       setUserInput("");
@@ -279,48 +374,68 @@ export const Bot = (props: BotProps & { class?: string }) => {
 
   // eslint-disable-next-line solid/reactivity
   createEffect(async () => {
-    const { data } = await isStreamAvailableQuery({
-      chatflowid: props.chatflowid,
-      apiHost: props.apiHost,
-    });
+    const currentCustomerFromLocal = localStorage.getItem("customer");
 
-    if (data) {
-      setIsChatFlowAvailableToStream(data?.isStreaming ?? false);
-    }
+    // if (currentCustomerFromLocal || hasCurrentCustomer()) {
+    if (currentCustomerFromLocal) {
+      const currentCustomer = JSON.parse(currentCustomerFromLocal);
+      console.log("currentCustomerFromLocal", currentCustomerFromLocal);
+      setCustomerId(currentCustomer?.ID);
+      setHasCurrentCustomer(true);
+      const { data } = await isStreamAvailableQuery({
+        chatflowid: props.chatflowid,
+        apiHost: props.apiHost,
+      });
 
-    const socket = socketIOClient(props.apiHost as string);
+      const { data: chatMessageHistory } = await getMessageHistory({
+        chatflowid: props.chatflowid,
+        apiHost: props.apiHost,
+        customerId: currentCustomer?.ID,
+      });
 
-    socket.on("connect", () => {
-      setSocketIOClientId(socket.id);
-    });
+      setChatHistory(chatMessageHistory);
 
-    socket.on("start", () => {
-      setMessages((prevMessages) => [
-        ...prevMessages,
-        { message: "", type: "apiMessage" },
-      ]);
-    });
-
-    socket.on("sourceDocuments", updateLastMessageSourceDocuments);
-
-    socket.on("token", updateLastMessage);
-
-    // eslint-disable-next-line solid/reactivity
-    return () => {
-      setUserInput("");
-      setLoading(false);
-      setMessages([
-        {
-          message: props.welcomeMessage ?? defaultWelcomeMessage,
-          type: "apiMessage",
-        },
-      ]);
-      if (socket) {
-        socket.disconnect();
-        setSocketIOClientId("");
+      if (data) {
+        setIsChatFlowAvailableToStream(data?.isStreaming ?? false);
       }
-    };
-  });
+
+      const socket = socketIOClient(props.apiHost as string);
+
+      socket.on("connect", () => {
+        setSocketIOClientId(socket.id);
+      });
+
+      socket.on("start", () => {
+        setMessages((prevMessages) => [
+          ...prevMessages,
+          { message: "", type: "apiMessage" },
+        ]);
+      });
+
+      socket.on("sourceDocuments", updateLastMessageSourceDocuments);
+
+      socket.on("token", updateLastMessage);
+
+      // eslint-disable-next-line solid/reactivity
+      return () => {
+        setUserInput("");
+        setLoading(false);
+        setMessages([
+          {
+            message: props.welcomeMessage ?? defaultWelcomeMessage,
+            type: "apiMessage",
+          },
+        ]);
+        if (socket) {
+          socket.disconnect();
+          setSocketIOClientId("");
+        }
+      };
+    } else {
+      setHasCurrentCustomer(false);
+    }
+    // }
+  }, [hasCurrentCustomer]);
 
   const isValidURL = (url: string): URL | undefined => {
     try {
@@ -369,6 +484,95 @@ export const Bot = (props: BotProps & { class?: string }) => {
     return newSourceDocuments;
   };
 
+  const [formData, setFormData] = createSignal<FormData>({
+    fullName: "",
+    email: "",
+    phone: "",
+    message: "",
+  });
+  const [errors, setErrors] = createSignal<FormErrors>({
+    fullName: "",
+    email: "",
+    phone: "",
+    message: "",
+  });
+  const validateEmail = (email: string) => {
+    const re =
+      /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|.(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
+    return re.test(String(email).toLowerCase());
+  };
+
+  const validate = () => {
+    const newErrors: FormErrors = {
+      fullName: "",
+      email: "",
+      phone: "",
+      message: "",
+    };
+    if (!formData().fullName) {
+      newErrors.fullName = "Full Name is required";
+    }
+    if (!formData().email) {
+      newErrors.email = "Valid email is required";
+    } else if (!validateEmail(formData().email)) {
+      newErrors.email = "Invalid email";
+    }
+    if (!formData().phone) {
+      newErrors.phone = "Phone number is required";
+    }
+    if (!formData().message) {
+      newErrors.message = "Message is required";
+    }
+    setErrors(newErrors);
+    return !Object.values(newErrors).some((error) => error);
+  };
+
+  const handleInput = (field: keyof FormData) => (e: Event) => {
+    setFormData({
+      ...formData(),
+      [field]: (e.target as HTMLInputElement).value,
+    });
+  };
+
+  const handleSubmitCustomerForm = async (event: Event) => {
+    event.preventDefault();
+    if (validate()) {
+      const generatedID = uuidv4();
+      await createCustomerBaseRow({
+        chatflowid: props.chatflowid,
+        apiHost: props.apiHost,
+        body: {
+          ID: generatedID,
+          email: formData().email,
+          name: formData().fullName,
+          phoneNumber: formData().phone,
+          origin: window.location.origin,
+        },
+      }).then((response) => {
+        const customer = response.data;
+        localStorage.setItem("customer", JSON.stringify(customer));
+        setHasCurrentCustomer(true);
+      });
+      // Handle form submission logic here
+    }
+  };
+
+  const handleSkipForm = async () => {
+    const generatedID = uuidv4();
+    await createCustomerBaseRow({
+      chatflowid: props.chatflowid,
+      apiHost: props.apiHost,
+      body: {
+        ID: generatedID,
+        name: "Anonymous",
+        origin: window.location.origin,
+      },
+    }).then((response) => {
+      const customer = response.data;
+      localStorage.setItem("customer", JSON.stringify(customer));
+      setHasCurrentCustomer(true);
+    });
+  };
   return (
     <>
       <div
@@ -379,80 +583,162 @@ export const Bot = (props: BotProps & { class?: string }) => {
         }
       >
         <div class="flex w-full h-full justify-center">
-          <div
-            style={{ "padding-bottom": "100px" }}
-            ref={chatContainer}
-            class="overflow-y-scroll min-w-full w-full min-h-full px-3 pt-10 relative scrollable-container chatbot-chat-view scroll-smooth"
-          >
-            <For each={[...messages()]}>
-              {(message, index) => (
-                <>
-                  {message.type === "userMessage" && (
-                    <GuestBubble
-                      message={message.message}
-                      backgroundColor={props.userMessage?.backgroundColor}
-                      textColor={props.userMessage?.textColor}
-                      showAvatar={props.userMessage?.showAvatar}
-                      avatarSrc={props.userMessage?.avatarSrc}
-                    />
+          {!hasCurrentCustomer() ? (
+            <div class="flex justify-center items-center min-w-full w-full min-h-full px-3 pt-10 relative chatbot-chat-view scroll-smooth">
+              <form class="w-full" onSubmit={handleSubmitCustomerForm}>
+                <p class="text-[14px] mt-[10px]">Full Name</p>
+                <input
+                  class="w-full text-[14px] border-slate-300 border-[1px] border-solid rounded-md mt-[5px] mb-[3px]"
+                  name="fullName"
+                  type="text"
+                  value={formData().fullName}
+                  onInput={handleInput("fullName")}
+                  placeholder="Please enter your full name"
+                />
+                {errors().fullName && (
+                  <div class="text-red-500 text-xs mb-[10px]">
+                    {errors().fullName}
+                  </div>
+                )}
+                <p class="text-[14px] mt-[10px]">Phone Number</p>
+                <input
+                  class="w-full text-[14px] border-slate-300 border-[1px] border-solid rounded-md mt-[5px] mb-[3px]"
+                  name="phone"
+                  type="text"
+                  value={formData().phone}
+                  onInput={handleInput("phone")}
+                  placeholder="Please enter your phone number"
+                />
+                {errors().phone && (
+                  <div class="text-red-500 text-xs mb-[10px]">
+                    {errors().phone}
+                  </div>
+                )}
+                <p class="text-[14px] mt-[10px]">Email</p>
+                <input
+                  class="w-full text-[14px] border-slate-300 border-[1px] border-solid rounded-md mt-[5px] mb-[3px]"
+                  name="email"
+                  value={formData().email}
+                  onInput={handleInput("email")}
+                  type="text"
+                  placeholder="Please enter your email"
+                />
+                {errors().email && (
+                  <div class="text-red-500 text-xs mb-[10px]">
+                    {errors().email}
+                  </div>
+                )}
+                <p class="text-[14px] mt-[10px]">Message</p>
+                <textarea
+                  class="w-full text-[14px] border-slate-300 border-[1px] border-solid rounded-md mt-[5px] mb-[3px] h-[100px] p-[5px]"
+                  name="message"
+                  value={formData().message}
+                  onInput={handleInput("message")}
+                  placeholder="Please enter your message"
+                />
+                {errors().message && (
+                  <div class="text-red-500 text-xs mb-[10px]">
+                    {errors().message}
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  class="w-full text-white bg-[#0076ff] mt-[10px] rounded-md h-[36px]"
+                >
+                  Send
+                </button>
+                <div class="w-full text-center mt-[10px] ">
+                  <p
+                    class=" text-[#0076ff] cursor-pointer "
+                    onClick={handleSkipForm}
+                  >
+                    Skip
+                  </p>
+                </div>
+              </form>
+            </div>
+          ) : (
+            <>
+              <div
+                style={{ "padding-bottom": "100px" }}
+                ref={chatContainer}
+                class="overflow-y-scroll min-w-full w-full min-h-full px-3 pt-10 relative scrollable-container chatbot-chat-view scroll-smooth"
+              >
+                <For each={[...messages()]}>
+                  {(message, index) => (
+                    <>
+                      {message.type === "userMessage" && (
+                        <GuestBubble
+                          message={message.message}
+                          backgroundColor={props.userMessage?.backgroundColor}
+                          textColor={props.userMessage?.textColor}
+                          showAvatar={props.userMessage?.showAvatar}
+                          avatarSrc={props.userMessage?.avatarSrc}
+                        />
+                      )}
+                      {message.type === "apiMessage" && (
+                        <BotBubble
+                          message={message.message}
+                          backgroundColor={props.botMessage?.backgroundColor}
+                          textColor={props.botMessage?.textColor}
+                          showAvatar={props.botMessage?.showAvatar}
+                          avatarSrc={props.botMessage?.avatarSrc}
+                        />
+                      )}
+                      {message.type === "userMessage" &&
+                        loading() &&
+                        index() === messages().length - 1 && <LoadingBubble />}
+                      {message.sourceDocuments &&
+                        message.sourceDocuments.length && (
+                          <div
+                            style={{
+                              display: "flex",
+                              "flex-direction": "row",
+                              width: "100%",
+                            }}
+                          >
+                            <For each={[...removeDuplicateURL(message)]}>
+                              {(src) => {
+                                const URL = isValidURL(src.metadata.source);
+                                return (
+                                  <SourceBubble
+                                    pageContent={
+                                      URL ? URL.pathname : src.pageContent
+                                    }
+                                    metadata={src.metadata}
+                                    onSourceClick={() => {
+                                      if (URL) {
+                                        window.open(
+                                          src.metadata.source,
+                                          "_blank"
+                                        );
+                                      } else {
+                                        setSourcePopupSrc(src);
+                                        setSourcePopupOpen(true);
+                                      }
+                                    }}
+                                  />
+                                );
+                              }}
+                            </For>
+                          </div>
+                        )}
+                    </>
                   )}
-                  {message.type === "apiMessage" && (
-                    <BotBubble
-                      message={message.message}
-                      backgroundColor={props.botMessage?.backgroundColor}
-                      textColor={props.botMessage?.textColor}
-                      showAvatar={props.botMessage?.showAvatar}
-                      avatarSrc={props.botMessage?.avatarSrc}
-                    />
-                  )}
-                  {message.type === "userMessage" &&
-                    loading() &&
-                    index() === messages().length - 1 && <LoadingBubble />}
-                  {message.sourceDocuments &&
-                    message.sourceDocuments.length && (
-                      <div
-                        style={{
-                          display: "flex",
-                          "flex-direction": "row",
-                          width: "100%",
-                        }}
-                      >
-                        <For each={[...removeDuplicateURL(message)]}>
-                          {(src) => {
-                            const URL = isValidURL(src.metadata.source);
-                            return (
-                              <SourceBubble
-                                pageContent={
-                                  URL ? URL.pathname : src.pageContent
-                                }
-                                metadata={src.metadata}
-                                onSourceClick={() => {
-                                  if (URL) {
-                                    window.open(src.metadata.source, "_blank");
-                                  } else {
-                                    setSourcePopupSrc(src);
-                                    setSourcePopupOpen(true);
-                                  }
-                                }}
-                              />
-                            );
-                          }}
-                        </For>
-                      </div>
-                    )}
-                </>
-              )}
-            </For>
-          </div>
-          <TextInput
-            backgroundColor={props.textInput?.backgroundColor}
-            textColor={props.textInput?.textColor}
-            placeholder={props.textInput?.placeholder}
-            sendButtonColor={props.textInput?.sendButtonColor}
-            fontSize={props.fontSize}
-            defaultValue={userInput()}
-            onSubmit={handleSubmit}
-          />
+                </For>
+              </div>
+              <TextInput
+                backgroundColor={props.textInput?.backgroundColor}
+                textColor={props.textInput?.textColor}
+                placeholder={props.textInput?.placeholder}
+                sendButtonColor={props.textInput?.sendButtonColor}
+                fontSize={props.fontSize}
+                defaultValue={userInput()}
+                onSubmit={handleSubmitMessage}
+              />
+            </>
+          )}
         </div>
 
         <Badge

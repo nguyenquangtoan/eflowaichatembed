@@ -8,6 +8,7 @@
   "scripts": {
     "dev": "rollup --watch --config rollup.config.js",
     "build": "rollup --config rollup.config.js",
+    "start": "rollup --config rollup.config.js --watch",
     "lint": "eslint \"src/**/*.ts*\"",
     "lint-fix": "eslint --fix \"src/**/*.ts*\""
   },
@@ -18,7 +19,8 @@
     "lodash": "^4.17.21",
     "socket.io-client": "^4.6.2",
     "solid-element": "1.7.0",
-    "solid-js": "1.7.1"
+    "solid-js": "1.7.1",
+    "uuid": "^9.0.1"
   },
   "devDependencies": {
     "@babel/preset-typescript": "7.21.4",
@@ -29,6 +31,8 @@
     "@rollup/plugin-typescript": "11.0.0",
     "@types/lodash": "^4.14.195",
     "@types/node": "18.15.11",
+    "@types/react": "^18.2.33",
+    "@types/uuid": "^9.0.6",
     "@typescript-eslint/eslint-plugin": "^5.57.0",
     "@typescript-eslint/parser": "^5.57.0",
     "autoprefixer": "10.4.14",
@@ -43,9 +47,9 @@
     "postcss": "8.4.21",
     "react": "18.2.0",
     "rollup": "3.23.0",
-    "rollup-plugin-livereload": "2.0.5",
+    "rollup-plugin-livereload": "^2.0.5",
     "rollup-plugin-postcss": "4.0.2",
-    "rollup-plugin-serve": "2.0.2",
+    "rollup-plugin-serve": "^2.0.2",
     "rollup-plugin-typescript-paths": "1.4.0",
     "rollup-plugin-uglify": "^6.0.4",
     "tailwindcss": "3.3.1",

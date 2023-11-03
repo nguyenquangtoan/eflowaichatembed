@@ -5,6 +5,27 @@ export type MessageType = {
     type: messageType;
     sourceDocuments?: any;
 };
+export type MessageHistoryType = {
+    chatflowid: string;
+    content: string;
+    createdDate: string;
+    customerId: string;
+    id: string;
+    role: messageType;
+    sourceDocuments: null;
+};
+export type FormData = {
+    fullName: string;
+    email: string;
+    phone: string;
+    message: string;
+};
+export type FormErrors = {
+    fullName: string;
+    email: string;
+    phone: string;
+    message: string;
+};
 export type BotProps = {
     chatflowid: string;
     apiHost?: string;
