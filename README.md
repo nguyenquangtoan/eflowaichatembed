@@ -86,7 +86,7 @@ You can also customize chatbot with different configuration
     },
     theme: {
       button: {
-        backgroundColor: "#3B81F6",
+        backgroundColor: "#0076ff",
         right: 20,
         bottom: 20,
         size: "medium",
@@ -109,7 +109,7 @@ You can also customize chatbot with different configuration
             "https://raw.githubusercontent.com/zahidkhawaja/langchain-chat-nextjs/main/public/parroticon.png",
         },
         userMessage: {
-          backgroundColor: "#3B81F6",
+          backgroundColor: "#0076ff",
           textColor: "#ffffff",
           showAvatar: true,
           avatarSrc:
@@ -119,7 +119,7 @@ You can also customize chatbot with different configuration
           placeholder: "Type your question",
           backgroundColor: "#ffffff",
           textColor: "#303235",
-          sendButtonColor: "#3B81F6",
+          sendButtonColor: "#0076ff",
         },
       },
     },

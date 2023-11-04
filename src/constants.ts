@@ -6,3 +6,11 @@ export const defaultBotProps: BubbleProps = {
   chatflowConfig: {},
   theme: {},
 };
+
+export const defaultChatBotTheme = {
+  fullLogo:
+    "https://eflowai-stg.epacific.net/static/media/new-eflowai-logo.551d012d5d5bcaa34334.png",
+  avatarSrc:
+    "https://eflowai.epacific.net/static/media/mini-eflowai-logo.9bf11126f696174fbc96.png",
+  primaryColor: "#0076ff",
+};

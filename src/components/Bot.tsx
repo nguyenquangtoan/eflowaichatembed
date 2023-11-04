@@ -21,6 +21,8 @@ import { Badge } from "./Badge";
 import socketIOClient from "socket.io-client";
 import { Popup } from "@/features/popup";
 import { v4 as uuidv4 } from "uuid";
+import StartConversation from "@/components/StartConversation";
+import { defaultChatBotTheme } from "@/constants";
 
 type messageType = "apiMessage" | "userMessage" | "usermessagewaiting";
 
@@ -173,7 +175,8 @@ export const Bot = (props: BotProps & { class?: string }) => {
     createSignal(false);
   const [chatHistory, setChatHistory] = createSignal<MessageHistoryType[]>();
   const [hasCurrentCustomer, setHasCurrentCustomer] = createSignal(false);
-  const [customerId, setCustomerId] = createSignal("");
+  const [isStartingConversation, setIsStartingConversation] =
+    createSignal(false);
 
   onMount(() => {
     if (!bottomSpacer) return;
@@ -375,12 +378,9 @@ export const Bot = (props: BotProps & { class?: string }) => {
   // eslint-disable-next-line solid/reactivity
   createEffect(async () => {
     const currentCustomerFromLocal = localStorage.getItem("customer");
-
     // if (currentCustomerFromLocal || hasCurrentCustomer()) {
-    if (currentCustomerFromLocal) {
+    if (currentCustomerFromLocal && isStartingConversation()) {
       const currentCustomer = JSON.parse(currentCustomerFromLocal);
-      console.log("currentCustomerFromLocal", currentCustomerFromLocal);
-      setCustomerId(currentCustomer?.ID);
       setHasCurrentCustomer(true);
       const { data } = await isStreamAvailableQuery({
         chatflowid: props.chatflowid,
@@ -548,10 +548,30 @@ export const Bot = (props: BotProps & { class?: string }) => {
           phoneNumber: formData().phone,
           origin: window.location.origin,
         },
-      }).then((response) => {
+      }).then(async (response) => {
         const customer = response.data;
-        localStorage.setItem("customer", JSON.stringify(customer));
         setHasCurrentCustomer(true);
+        localStorage.setItem("customer", JSON.stringify(customer));
+        await handleSubmitMessage(formData().message).then(async () => {
+          setUserInput("");
+          const body: IncomingInput = {
+            question: `My name is ${formData().fullName}, email is ${
+              formData().email
+            } and my phone is ${formData().phone}`,
+            history: [],
+          };
+
+          if (props.chatflowConfig) body.overrideConfig = props.chatflowConfig;
+
+          if (isChatFlowAvailableToStream())
+            body.socketIOClientId = socketIOClientId();
+
+          await sendMessageQuery({
+            chatflowid: props.chatflowid,
+            apiHost: props.apiHost,
+            body,
+          });
+        });
       });
       // Handle form submission logic here
     }
@@ -573,6 +593,11 @@ export const Bot = (props: BotProps & { class?: string }) => {
       setHasCurrentCustomer(true);
     });
   };
+
+  const handleStartConversation = (value: boolean) => {
+    setIsStartingConversation(value);
+  };
+
   return (
     <>
       <div
@@ -583,160 +608,193 @@ export const Bot = (props: BotProps & { class?: string }) => {
         }
       >
         <div class="flex w-full h-full justify-center">
-          {!hasCurrentCustomer() ? (
-            <div class="flex justify-center items-center min-w-full w-full min-h-full px-3 pt-10 relative chatbot-chat-view scroll-smooth">
-              <form class="w-full" onSubmit={handleSubmitCustomerForm}>
-                <p class="text-[14px] mt-[10px]">Full Name</p>
-                <input
-                  class="w-full text-[14px] border-slate-300 border-[1px] border-solid rounded-md mt-[5px] mb-[3px]"
-                  name="fullName"
-                  type="text"
-                  value={formData().fullName}
-                  onInput={handleInput("fullName")}
-                  placeholder="Please enter your full name"
-                />
-                {errors().fullName && (
-                  <div class="text-red-500 text-xs mb-[10px]">
-                    {errors().fullName}
-                  </div>
-                )}
-                <p class="text-[14px] mt-[10px]">Phone Number</p>
-                <input
-                  class="w-full text-[14px] border-slate-300 border-[1px] border-solid rounded-md mt-[5px] mb-[3px]"
-                  name="phone"
-                  type="text"
-                  value={formData().phone}
-                  onInput={handleInput("phone")}
-                  placeholder="Please enter your phone number"
-                />
-                {errors().phone && (
-                  <div class="text-red-500 text-xs mb-[10px]">
-                    {errors().phone}
-                  </div>
-                )}
-                <p class="text-[14px] mt-[10px]">Email</p>
-                <input
-                  class="w-full text-[14px] border-slate-300 border-[1px] border-solid rounded-md mt-[5px] mb-[3px]"
-                  name="email"
-                  value={formData().email}
-                  onInput={handleInput("email")}
-                  type="text"
-                  placeholder="Please enter your email"
-                />
-                {errors().email && (
-                  <div class="text-red-500 text-xs mb-[10px]">
-                    {errors().email}
-                  </div>
-                )}
-                <p class="text-[14px] mt-[10px]">Message</p>
-                <textarea
-                  class="w-full text-[14px] border-slate-300 border-[1px] border-solid rounded-md mt-[5px] mb-[3px] h-[100px] p-[5px]"
-                  name="message"
-                  value={formData().message}
-                  onInput={handleInput("message")}
-                  placeholder="Please enter your message"
-                />
-                {errors().message && (
-                  <div class="text-red-500 text-xs mb-[10px]">
-                    {errors().message}
-                  </div>
-                )}
-
-                <button
-                  type="submit"
-                  class="w-full text-white bg-[#0076ff] mt-[10px] rounded-md h-[36px]"
-                >
-                  Send
-                </button>
-                <div class="w-full text-center mt-[10px] ">
-                  <p
-                    class=" text-[#0076ff] cursor-pointer "
-                    onClick={handleSkipForm}
-                  >
-                    Skip
-                  </p>
-                </div>
-              </form>
-            </div>
+          {!isStartingConversation() ? (
+            <StartConversation
+              buttonColor={props.textInput?.sendButtonColor}
+              imgLogo={props.botMessage?.avatarSrc}
+              handleStartConversation={handleStartConversation}
+            />
           ) : (
             <>
-              <div
-                style={{ "padding-bottom": "100px" }}
-                ref={chatContainer}
-                class="overflow-y-scroll min-w-full w-full min-h-full px-3 pt-10 relative scrollable-container chatbot-chat-view scroll-smooth"
-              >
-                <For each={[...messages()]}>
-                  {(message, index) => (
-                    <>
-                      {message.type === "userMessage" && (
-                        <GuestBubble
-                          message={message.message}
-                          backgroundColor={props.userMessage?.backgroundColor}
-                          textColor={props.userMessage?.textColor}
-                          showAvatar={props.userMessage?.showAvatar}
-                          avatarSrc={props.userMessage?.avatarSrc}
-                        />
+              {!hasCurrentCustomer() ? (
+                <div class="flex flex-col justify-start min-w-full w-full min-h-full px-4 pt-10 relative chatbot-chat-view scroll-smooth">
+                  <div>
+                    <img
+                      src={
+                        props.botMessage?.avatarSrc ??
+                        defaultChatBotTheme.fullLogo
+                      }
+                      class="w-[150px]"
+                      alt=""
+                    />
+                    <p class="mt-[10px]">
+                      Share your queries or comments here. 🤖
+                    </p>
+                  </div>
+
+                  <form
+                    class="w-full mt-[10px]"
+                    onSubmit={handleSubmitCustomerForm}
+                  >
+                    <p class="text-[14px] mt-[10px]">Full Name</p>
+                    <input
+                      class="w-full text-[14px] border-slate-300 border-[1px] border-solid rounded-md mt-[5px] mb-[3px]"
+                      name="fullName"
+                      type="text"
+                      value={formData().fullName}
+                      onInput={handleInput("fullName")}
+                      placeholder="Please enter your full name"
+                    />
+                    {errors().fullName && (
+                      <div class="text-red-500 text-xs mb-[10px]">
+                        {errors().fullName}
+                      </div>
+                    )}
+                    <p class="text-[14px] mt-[10px]">Phone Number</p>
+                    <input
+                      class="w-full text-[14px] border-slate-300 border-[1px] border-solid rounded-md mt-[5px] mb-[3px]"
+                      name="phone"
+                      type="text"
+                      value={formData().phone}
+                      onInput={handleInput("phone")}
+                      placeholder="Please enter your phone number"
+                    />
+                    {errors().phone && (
+                      <div class="text-red-500 text-xs mb-[10px]">
+                        {errors().phone}
+                      </div>
+                    )}
+                    <p class="text-[14px] mt-[10px]">Email</p>
+                    <input
+                      class="w-full text-[14px] border-slate-300 border-[1px] border-solid rounded-md mt-[5px] mb-[3px]"
+                      name="email"
+                      value={formData().email}
+                      onInput={handleInput("email")}
+                      type="text"
+                      placeholder="Please enter your email"
+                    />
+                    {errors().email && (
+                      <div class="text-red-500 text-xs mb-[10px]">
+                        {errors().email}
+                      </div>
+                    )}
+                    <p class="text-[14px] mt-[10px]">Message</p>
+                    <textarea
+                      class="w-full text-[14px] border-slate-300 border-[1px] border-solid rounded-md mt-[5px] mb-[3px] h-[100px] p-[5px]"
+                      name="message"
+                      value={formData().message}
+                      onInput={handleInput("message")}
+                      placeholder="Please enter your message"
+                    />
+                    {errors().message && (
+                      <div class="text-red-500 text-xs mb-[10px]">
+                        {errors().message}
+                      </div>
+                    )}
+
+                    <button
+                      type="submit"
+                      class="w-full text-white bg-[#0076ff] mt-[10px] rounded-md h-[36px]"
+                    >
+                      Send
+                    </button>
+                    <div class="w-full text-center mt-[10px] ">
+                      <p
+                        class=" text-[#0076ff] cursor-pointer "
+                        onClick={handleSkipForm}
+                      >
+                        Skip
+                      </p>
+                    </div>
+                  </form>
+                </div>
+              ) : (
+                <>
+                  <div
+                    style={{ "padding-bottom": "100px" }}
+                    ref={chatContainer}
+                    class="overflow-y-scroll min-w-full w-full min-h-full px-3 pt-10 relative scrollable-container chatbot-chat-view scroll-smooth"
+                  >
+                    <For each={[...messages()]}>
+                      {(message, index) => (
+                        <>
+                          {message.type === "userMessage" && (
+                            <GuestBubble
+                              message={message.message}
+                              backgroundColor={
+                                props.userMessage?.backgroundColor
+                              }
+                              textColor={props.userMessage?.textColor}
+                              showAvatar={props.userMessage?.showAvatar}
+                              avatarSrc={props.userMessage?.avatarSrc}
+                            />
+                          )}
+                          {message.type === "apiMessage" && (
+                            <BotBubble
+                              message={message.message}
+                              backgroundColor={
+                                props.botMessage?.backgroundColor
+                              }
+                              textColor={props.botMessage?.textColor}
+                              showAvatar={props.botMessage?.showAvatar}
+                              avatarSrc={props.botMessage?.avatarSrc}
+                            />
+                          )}
+                          {message.type === "userMessage" &&
+                            loading() &&
+                            index() === messages().length - 1 && (
+                              <LoadingBubble />
+                            )}
+                          {message.sourceDocuments &&
+                            message.sourceDocuments.length && (
+                              <div
+                                style={{
+                                  display: "flex",
+                                  "flex-direction": "row",
+                                  width: "100%",
+                                }}
+                              >
+                                <For each={[...removeDuplicateURL(message)]}>
+                                  {(src) => {
+                                    const URL = isValidURL(src.metadata.source);
+                                    return (
+                                      <SourceBubble
+                                        pageContent={
+                                          URL ? URL.pathname : src.pageContent
+                                        }
+                                        metadata={src.metadata}
+                                        onSourceClick={() => {
+                                          if (URL) {
+                                            window.open(
+                                              src.metadata.source,
+                                              "_blank"
+                                            );
+                                          } else {
+                                            setSourcePopupSrc(src);
+                                            setSourcePopupOpen(true);
+                                          }
+                                        }}
+                                      />
+                                    );
+                                  }}
+                                </For>
+                              </div>
+                            )}
+                        </>
                       )}
-                      {message.type === "apiMessage" && (
-                        <BotBubble
-                          message={message.message}
-                          backgroundColor={props.botMessage?.backgroundColor}
-                          textColor={props.botMessage?.textColor}
-                          showAvatar={props.botMessage?.showAvatar}
-                          avatarSrc={props.botMessage?.avatarSrc}
-                        />
-                      )}
-                      {message.type === "userMessage" &&
-                        loading() &&
-                        index() === messages().length - 1 && <LoadingBubble />}
-                      {message.sourceDocuments &&
-                        message.sourceDocuments.length && (
-                          <div
-                            style={{
-                              display: "flex",
-                              "flex-direction": "row",
-                              width: "100%",
-                            }}
-                          >
-                            <For each={[...removeDuplicateURL(message)]}>
-                              {(src) => {
-                                const URL = isValidURL(src.metadata.source);
-                                return (
-                                  <SourceBubble
-                                    pageContent={
-                                      URL ? URL.pathname : src.pageContent
-                                    }
-                                    metadata={src.metadata}
-                                    onSourceClick={() => {
-                                      if (URL) {
-                                        window.open(
-                                          src.metadata.source,
-                                          "_blank"
-                                        );
-                                      } else {
-                                        setSourcePopupSrc(src);
-                                        setSourcePopupOpen(true);
-                                      }
-                                    }}
-                                  />
-                                );
-                              }}
-                            </For>
-                          </div>
-                        )}
-                    </>
-                  )}
-                </For>
-              </div>
-              <TextInput
-                backgroundColor={props.textInput?.backgroundColor}
-                textColor={props.textInput?.textColor}
-                placeholder={props.textInput?.placeholder}
-                sendButtonColor={props.textInput?.sendButtonColor}
-                fontSize={props.fontSize}
-                defaultValue={userInput()}
-                onSubmit={handleSubmitMessage}
-              />
+                    </For>
+                  </div>
+                  <TextInput
+                    backgroundColor={props.textInput?.backgroundColor}
+                    textColor={props.textInput?.textColor}
+                    placeholder={props.textInput?.placeholder}
+                    sendButtonColor={props.textInput?.sendButtonColor}
+                    fontSize={props.fontSize}
+                    defaultValue={userInput()}
+                    onSubmit={handleSubmitMessage}
+                  />
+                </>
+              )}
             </>
           )}
         </div>
