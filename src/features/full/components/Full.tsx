@@ -56,6 +56,7 @@ export const Full = (
             chatflowid={props.chatflowid}
             chatflowConfig={props.chatflowConfig}
             apiHost={props.apiHost}
+            hasCustomerForm={props.hasCustomerForm}
           />
         </div>
       </Show>

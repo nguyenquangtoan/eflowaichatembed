@@ -29,6 +29,7 @@ export type FormErrors = {
 export type BotProps = {
     chatflowid: string;
     apiHost?: string;
+    hasCustomerForm?: boolean;
     chatflowConfig?: Record<string, unknown>;
     welcomeMessage?: string;
     botMessage?: BotMessageTheme;

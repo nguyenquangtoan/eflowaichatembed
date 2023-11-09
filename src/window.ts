@@ -2,6 +2,7 @@
 type BotProps = {
   chatflowid: string;
   apiHost?: string;
+  hasCustomerForm?: boolean;
   chatflowConfig?: Record<string, unknown>;
 };
 

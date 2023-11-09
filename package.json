@@ -1,6 +1,6 @@
 {
   "name": "eflowai-embed",
-  "version": "1.0.13",
+  "version": "1.0.0",
   "description": "Javascript library to display eflowai chatbot on your website",
   "type": "module",
   "main": "dist/index.js",
@@ -16,6 +16,7 @@
   "dependencies": {
     "@babel/core": "^7.22.1",
     "@ts-stack/markdown": "^1.4.0",
+    "eflowai-embed": "^1.0.0",
     "lodash": "^4.17.21",
     "socket.io-client": "^4.6.2",
     "solid-element": "1.7.0",
@@ -54,5 +55,17 @@
     "rollup-plugin-uglify": "^6.0.4",
     "tailwindcss": "3.3.1",
     "typescript": "5.0.3"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nguyenquangtoan/eflowaichatembed.git"
+  },
+  "keywords": [
+    "eflowai"
+  ],
+  "author": "eflowai",
+  "bugs": {
+    "url": "https://github.com/nguyenquangtoan/eflowaichatembed/issues"
+  },
+  "homepage": "https://github.com/nguyenquangtoan/eflowaichatembed#readme"
 }

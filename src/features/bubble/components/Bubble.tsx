@@ -70,6 +70,7 @@ export const Bubble = (props: BubbleProps) => {
             chatflowid={props.chatflowid}
             chatflowConfig={props.chatflowConfig}
             apiHost={props.apiHost}
+            hasCustomerForm={props.hasCustomerForm}
           />
         </Show>
       </div>

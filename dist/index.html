@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Your App Title</title>
+    <!-- Additional meta tags, stylesheets, or favicon links can be added here -->
+  </head>
+  <body>
+    <!-- The root div where your React app will be mounted -->
+    <div id="root"></div>
+
+    <!-- Your compiled JavaScript file from Rollup -->
+    <script type="module">
+      import Chatbot from "./web.js";
+      Chatbot.init({
+        chatflowid: "2f21a940-c25d-4d2c-b516-17153777144f",
+        apiHost: "https://eflowai-api-stg.epacific.net",
+        hasCustomerForm: false,
+      });
+    </script>
+  </body>
+</html>
