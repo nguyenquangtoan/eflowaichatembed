@@ -517,7 +517,10 @@ export const Bot = (props: BotProps & { class?: string }) => {
   const handleStartConversation = (value: boolean) => {
     setIsStartingConversation(value);
   };
-  console.log("props.hasCustomerForm", props.hasCustomerForm);
+  console.log(
+    "props.textInput?.sendButtonColor",
+    props.textInput?.sendButtonColor
+  );
   return (
     <>
       <div
@@ -527,7 +530,7 @@ export const Bot = (props: BotProps & { class?: string }) => {
           props.class
         }
       >
-        <div class="flex w-full h-full justify-center">
+        <div class="flex w-full h-full justify-center overflow-scroll">
           {!props.hasCustomerForm ? (
             <>
               <div
@@ -624,11 +627,11 @@ export const Bot = (props: BotProps & { class?: string }) => {
                         props.botMessage?.avatarSrc ??
                         defaultChatBotTheme.fullLogo
                       }
-                      class="w-[150px]"
+                      class="max-w-[70px]"
                       alt=""
                     />
                     <p class="mt-[10px]">
-                      Share your queries or comments here. 🤖
+                      Share your queries or comments here. 🤗
                     </p>
                   </div>
 
@@ -691,18 +694,19 @@ export const Bot = (props: BotProps & { class?: string }) => {
                         {errors().message}
                       </div>
                     )}
-
                     <button
                       type="submit"
-                      class="w-full text-white bg-[#0076ff] mt-[10px] rounded-md h-[36px]"
+                      class={
+                        (props.textInput?.sendButtonColor
+                          ? `bg-[${props.textInput?.sendButtonColor}]`
+                          : `bg-[${defaultChatBotTheme.primaryColor}]`) +
+                        " w-full text-white font-semibold mt-[10px] rounded-md h-[36px]"
+                      }
                     >
                       Send
                     </button>
-                    <div class="w-full text-center mt-[10px] ">
-                      <p
-                        class=" text-[#0076ff] cursor-pointer "
-                        onClick={handleSkipForm}
-                      >
+                    <div class="w-full text-center mt-[5px] ">
+                      <p class="cursor-pointer" onClick={handleSkipForm}>
                         Skip
                       </p>
                     </div>
@@ -822,5 +826,5 @@ type BottomSpacerProps = {
   ref: HTMLDivElement | undefined;
 };
 const BottomSpacer = (props: BottomSpacerProps) => {
-  return <div ref={props.ref} class="w-full h-32" />;
+  return <div ref={props.ref} class="w-full h-16" />;
 };

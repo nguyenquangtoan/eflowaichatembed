@@ -20,7 +20,7 @@ const StartConversation = (props: StartConversationProps) => {
   const handleConversation = () => {
     props.handleStartConversation(true);
   };
-  console.log("props.buttonColor", props.buttonColor);
+
   return (
     <div class="flex flex-col justify-start p-[30px]">
       <div>
@@ -54,12 +54,7 @@ const StartConversation = (props: StartConversationProps) => {
           </button>
         ) : (
           <button
-            class={
-              "text-sm flex flex-row items-center rounded-md font-semibold p-[10px] hover:bg-slate-100 " +
-              (props.buttonColor
-                ? `text-[${props.buttonColor}]`
-                : `text-[${defaultChatBotTheme.primaryColor}]`)
-            }
+            class="text-sm flex flex-row items-center rounded-md font-semibold p-[10px] hover:bg-slate-100"
             on:click={handleConversation}
           >
             Start new conversation{" "}

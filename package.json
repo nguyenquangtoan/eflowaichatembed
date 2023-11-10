@@ -1,6 +1,6 @@
 {
   "name": "eflowai-embed",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "description": "Javascript library to display eflowai chatbot on your website",
   "type": "module",
   "main": "dist/index.js",
