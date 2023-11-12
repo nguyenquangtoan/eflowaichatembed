@@ -244,7 +244,6 @@ export const Bot = (props: BotProps & { class?: string }) => {
 
     if (result.data) {
       const data = handleVectaraMetadata(result.data);
-
       if (typeof data === "object" && data.text && data.sourceDocuments) {
         if (!isChatFlowAvailableToStream()) {
           setMessages((prevMessages) => [
@@ -261,11 +260,11 @@ export const Bot = (props: BotProps & { class?: string }) => {
         if (!isChatFlowAvailableToStream()) {
           setMessages((prevMessages) => [
             ...prevMessages,
-            { message: data, type: "apiMessage" },
+            { message: data.text, type: "apiMessage" },
           ]);
         }
 
-        addChatMessage(data, "apiMessage");
+        addChatMessage(data.text, "apiMessage");
       }
       setLoading(false);
       setUserInput("");
